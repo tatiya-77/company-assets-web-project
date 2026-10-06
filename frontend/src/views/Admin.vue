@@ -1,94 +1,167 @@
+```vue
 <template>
   <div class="admin-page">
 
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
-
-    <div class="header">
+    <!-- ================= HEADER ================= -->
+    <header class="admin-header">
       <div>
-        <h1>Admin System</h1>
-        <p>ระบบจัดการทรัพย์สินและการยืมคืน</p>
+        <h1>ระบบจัดการ Admin</h1>
+        <p>จัดการทรัพย์สินและรายการยืมคืนของบริษัท</p>
       </div>
 
-      <button class="logout-btn" @click="logout">
-        ออกจากระบบ
+      <button class="refresh-btn" @click="loadAll">
+        🔄 รีเฟรช
       </button>
-    </div>
+    </header>
 
 
-    <!-- =====================================================
-         ERROR / SUCCESS
-    ====================================================== -->
+    <!-- ================= DASHBOARD ================= -->
+    <section class="dashboard">
 
-    <div v-if="message" class="alert success">
-      {{ message }}
-    </div>
-
-    <div v-if="error" class="alert error">
-      {{ error }}
-    </div>
-
-
-    <!-- =====================================================
-         DASHBOARD
-    ====================================================== -->
-
-    <div class="grid">
-
-      <div class="card stat-card">
-        <span>ทรัพย์สินทั้งหมด</span>
-        <h2>{{ stats.assets }}</h2>
-      </div>
-
-      <div class="card stat-card">
-        <span>พร้อมให้ยืม</span>
-        <h2>{{ stats.available }}</h2>
-      </div>
-
-      <div class="card stat-card">
-        <span>กำลังถูกยืม</span>
-        <h2>{{ stats.borrowed }}</h2>
-      </div>
-
-      <div class="card stat-card pending">
-        <span>รออนุมัติ</span>
-        <h2>{{ stats.pending }}</h2>
-      </div>
-
-      <div class="card stat-card returned">
-        <span>คืนแล้ว</span>
-        <h2>{{ stats.returned }}</h2>
-      </div>
-
-      <div class="card stat-card">
-        <span>สมาชิกทั้งหมด</span>
-        <h2>{{ stats.employees }}</h2>
-      </div>
-
-    </div>
-
-
-    <!-- =====================================================
-         ASSET MANAGEMENT
-    ====================================================== -->
-
-    <div class="card">
-
-      <div class="section-header">
+      <div class="stat-card">
+        <div class="stat-icon">📦</div>
         <div>
-          <h2>จัดการทรัพย์สิน</h2>
-          <p>เพิ่ม แก้ไข ลบ และค้นหาทรัพย์สิน</p>
+          <span>ทรัพย์สินทั้งหมด</span>
+          <strong>{{ stats.totalAssets }}</strong>
         </div>
       </div>
 
-      <input
-        v-model="q"
-        @input="loadAssets"
-        class="search"
-        placeholder="ค้นหาชื่อทรัพย์สิน / Serial Number..."
-      />
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div>
+          <span>พร้อมใช้งาน</span>
+          <strong>{{ stats.availableAssets }}</strong>
+        </div>
+      </div>
 
+      <div class="stat-card">
+        <div class="stat-icon">📤</div>
+        <div>
+          <span>กำลังถูกยืม</span>
+          <strong>{{ stats.borrowedAssets }}</strong>
+        </div>
+      </div>
+
+      <div class="stat-card warning">
+        <div class="stat-icon">⏳</div>
+        <div>
+          <span>รออนุมัติยืม</span>
+          <strong>{{ stats.pendingBorrow }}</strong>
+        </div>
+      </div>
+
+      <div class="stat-card return-warning">
+        <div class="stat-icon">🔄</div>
+        <div>
+          <span>รออนุมัติคืน</span>
+          <strong>{{ returnRequestedCount }}</strong>
+        </div>
+      </div>
+
+      <div class="stat-card success">
+        <div class="stat-icon">📥</div>
+        <div>
+          <span>คืนแล้ว</span>
+          <strong>{{ stats.returned }}</strong>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ================= ASSET MANAGEMENT ================= -->
+    <section class="panel">
+
+      <div class="panel-header">
+        <div>
+          <h2>จัดการทรัพย์สิน</h2>
+          <p>เพิ่ม แก้ไข และลบทรัพย์สินของบริษัท</p>
+        </div>
+
+        <button class="primary-btn" @click="openAssetForm()">
+          ➕ เพิ่มทรัพย์สิน
+        </button>
+      </div>
+
+
+      <!-- Asset Form -->
+      <div v-if="showAssetForm" class="asset-form">
+
+        <h3>
+          {{ editingAsset ? '✏️ แก้ไขทรัพย์สิน' : '➕ เพิ่มทรัพย์สิน' }}
+        </h3>
+
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label>ชื่อทรัพย์สิน</label>
+            <input
+              v-model="assetForm.AssetName"
+              type="text"
+              placeholder="เช่น Notebook Dell"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Serial Number</label>
+            <input
+              v-model="assetForm.SerialNumber"
+              type="text"
+              placeholder="เช่น SN123456"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>หมวดหมู่</label>
+
+            <select v-model="assetForm.CategoryID">
+              <option value="">เลือกหมวดหมู่</option>
+
+              <option
+                v-for="category in categories"
+                :key="category.CategoryID"
+                :value="category.CategoryID"
+              >
+                {{ category.CategoryName }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>สถานะ</label>
+
+            <select v-model="assetForm.Status">
+              <option value="Available">Available</option>
+              <option value="Borrowed">Borrowed</option>
+              <option value="Maintenance">Maintenance</option>
+            </select>
+          </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+          <button
+            class="primary-btn"
+            @click="saveAsset"
+          >
+            💾 บันทึก
+          </button>
+
+          <button
+            class="cancel-btn"
+            @click="closeAssetForm"
+          >
+            ยกเลิก
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- Asset Table -->
       <div class="table-wrapper">
 
         <table>
@@ -97,10 +170,9 @@
             <tr>
               <th>ID</th>
               <th>ชื่อทรัพย์สิน</th>
-              <th>ประเภท</th>
+              <th>Serial Number</th>
+              <th>หมวดหมู่</th>
               <th>สถานะ</th>
-              <th>Serial</th>
-              <th>สถานที่</th>
               <th>จัดการ</th>
             </tr>
           </thead>
@@ -112,52 +184,46 @@
               :key="asset.AssetID"
             >
 
+              <td>{{ asset.AssetID }}</td>
+
               <td>
-                {{ asset.AssetID }}
+                <strong>{{ asset.AssetName }}</strong>
+              </td>
+
+              <td>{{ asset.SerialNumber || '-' }}</td>
+
+              <td>
+                {{ asset.CategoryName || asset.CategoryID || '-' }}
               </td>
 
               <td>
-                {{ asset.AssetName }}
-              </td>
-
-              <td>
-                {{ asset.CategoryName || '-' }}
-              </td>
-
-              <td>
-
                 <span
                   class="status"
                   :class="asset.Status"
                 >
-                  {{ asset.Status }}
+                  {{ assetStatusText(asset.Status) }}
                 </span>
-
-              </td>
-
-              <td>
-                {{ asset.SerialNumber || '-' }}
-              </td>
-
-              <td>
-                {{ asset.Location || '-' }}
               </td>
 
               <td>
 
-                <button
-                  class="small-btn"
-                  @click="edit(asset)"
-                >
-                  แก้ไข
-                </button>
+                <div class="action-buttons">
 
-                <button
-                  class="small-btn danger"
-                  @click="remove(asset.AssetID)"
-                >
-                  ลบ
-                </button>
+                  <button
+                    class="edit-btn"
+                    @click="openAssetForm(asset)"
+                  >
+                    ✏️ แก้ไข
+                  </button>
+
+                  <button
+                    class="delete-btn"
+                    @click="deleteAsset(asset.AssetID)"
+                  >
+                    🗑️ ลบ
+                  </button>
+
+                </div>
 
               </td>
 
@@ -166,7 +232,7 @@
             <tr v-if="assets.length === 0">
 
               <td
-                colspan="7"
+                colspan="6"
                 class="empty"
               >
                 ไม่พบข้อมูลทรัพย์สิน
@@ -180,190 +246,33 @@
 
       </div>
 
-    </div>
+    </section>
 
 
-    <!-- =====================================================
-         ASSET FORM
-    ====================================================== -->
+    <!-- ================= BORROW MANAGEMENT ================= -->
+    <section class="panel">
 
-    <div class="card">
-
-      <h2>
-        {{ form.AssetID ? 'แก้ไขทรัพย์สิน' : 'เพิ่มทรัพย์สิน' }}
-      </h2>
-
-      <div class="form-grid">
-
-        <div class="form-group">
-
-          <label>
-            ชื่อทรัพย์สิน
-          </label>
-
-          <input
-            v-model="form.AssetName"
-            placeholder="เช่น Notebook Dell"
-          />
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            ประเภท
-          </label>
-
-          <select v-model="form.CategoryID">
-
-            <option
-              disabled
-              value=""
-            >
-              -- เลือกประเภท --
-            </option>
-
-            <option
-              v-for="category in categories"
-              :key="category.CategoryID"
-              :value="category.CategoryID"
-            >
-              {{ category.CategoryName }}
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            สถานะ
-          </label>
-
-          <select
-            v-model="form.Status"
-            :disabled="form.Status === 'Borrowed'"
-          >
-
-            <option value="Available">
-              Available
-            </option>
-
-            <option value="Borrowed">
-              Borrowed
-            </option>
-
-            <option value="Broken">
-              Broken
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            วันที่ซื้อ
-          </label>
-
-          <input
-            v-model="form.PurchaseDate"
-            type="date"
-          />
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            ราคา
-          </label>
-
-          <input
-            v-model="form.Price"
-            type="number"
-            min="0"
-            placeholder="ราคา"
-          />
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Serial Number
-          </label>
-
-          <input
-            v-model="form.SerialNumber"
-            placeholder="Serial Number"
-          />
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            สถานที่เก็บ
-          </label>
-
-          <input
-            v-model="form.Location"
-            placeholder="เช่น ห้อง IT"
-          />
-
-        </div>
-
-      </div>
-
-
-      <div class="form-actions">
-
-        <button
-          class="primary"
-          @click="save"
-        >
-          {{ form.AssetID ? 'Update' : 'Insert' }}
-        </button>
-
-        <button
-          class="secondary"
-          @click="clear"
-        >
-          Clear
-        </button>
-
-      </div>
-
-    </div>
-
-
-    <!-- =====================================================
-         BORROW MANAGEMENT
-    ====================================================== -->
-
-    <div class="card">
-
-      <div class="section-header">
+      <div class="panel-header">
 
         <div>
-          <h2>
-            รายการยืม / คืนทรัพย์สิน
-          </h2>
+          <h2>รายการยืม - คืนทรัพย์สิน</h2>
 
           <p>
-            Admin สามารถอนุมัติ ปฏิเสธ และรับคืนทรัพย์สิน
+            ตรวจสอบคำขอยืมและคำขอคืนจากพนักงาน
           </p>
         </div>
 
+      </div>
+
+
+      <!-- Important notice -->
+      <div
+        v-if="returnRequestedCount > 0"
+        class="return-alert"
+      >
+        🔔 มีคำขอคืนทรัพย์สิน
+        <strong>{{ returnRequestedCount }}</strong>
+        รายการ รอการอนุมัติจาก Admin
       </div>
 
 
@@ -374,15 +283,27 @@
           <thead>
 
             <tr>
+
               <th>ID</th>
-              <th>สมาชิก</th>
-              <th>Email</th>
+
+              <th>พนักงาน</th>
+
+              <th>อีเมล</th>
+
               <th>ทรัพย์สิน</th>
+
+              <th>Serial Number</th>
+
               <th>วันที่ยืม</th>
+
               <th>กำหนดคืน</th>
+
               <th>วันที่คืน</th>
+
               <th>สถานะ</th>
-              <th>Action</th>
+
+              <th>จัดการ</th>
+
             </tr>
 
           </thead>
@@ -391,103 +312,158 @@
           <tbody>
 
             <tr
-              v-for="borrow in borrows"
-              :key="borrow.TransactionID"
+              v-for="item in borrows"
+              :key="item.TransactionID"
             >
 
               <td>
-                {{ borrow.TransactionID }}
+                {{ item.TransactionID }}
               </td>
 
-              <td>
-                {{ borrow.EmployeeName }}
-              </td>
 
               <td>
-                {{ borrow.EmployeeEmail || '-' }}
+                {{ item.EmployeeName || item.Name || '-' }}
               </td>
 
-              <td>
-                {{ borrow.AssetName }}
-              </td>
 
               <td>
-                {{ formatDate(borrow.BorrowDate) }}
+                {{ item.Email || '-' }}
               </td>
 
-              <td>
-                {{ formatDate(borrow.DueDate) }}
-              </td>
 
               <td>
-                {{ formatDate(borrow.ReturnDate) }}
+                {{ item.AssetName || '-' }}
               </td>
+
+
+              <td>
+                {{ item.SerialNumber || '-' }}
+              </td>
+
+
+              <td>
+                {{ formatDate(item.BorrowDate) }}
+              </td>
+
+
+              <td>
+                {{ formatDate(item.DueDate) }}
+              </td>
+
+
+              <td>
+                {{ formatDate(item.ReturnDate) }}
+              </td>
+
+
+              <!-- STATUS -->
 
               <td>
 
                 <span
                   class="status"
-                  :class="borrow.Status"
+                  :class="item.Status"
                 >
-                  {{ statusText(borrow.Status) }}
+                  {{ borrowStatusText(item.Status) }}
                 </span>
 
               </td>
 
+
+              <!-- ACTION -->
+
               <td>
 
-                <!-- Pending -->
-                <div
-                  v-if="borrow.Status === 'PendingApproval'"
-                  class="actions"
-                >
+                <div class="borrow-actions">
 
-                  <button
-                    class="approve"
-                    @click="approve(borrow.TransactionID)"
-                  >
-                    อนุมัติ
-                  </button>
 
-                  <button
-                    class="reject"
-                    @click="reject(borrow.TransactionID)"
+                  <!-- ================= PENDING BORROW ================= -->
+
+                  <template
+                    v-if="item.Status === 'PendingApproval'"
                   >
-                    ปฏิเสธ
-                  </button>
+
+                    <button
+                      class="approve-btn"
+                      @click="approveBorrow(item.TransactionID)"
+                    >
+                      ✅ อนุมัติยืม
+                    </button>
+
+                    <button
+                      class="reject-btn"
+                      @click="rejectBorrow(item.TransactionID)"
+                    >
+                      ❌ ปฏิเสธ
+                    </button>
+
+                  </template>
+
+
+                  <!-- ================= BORROWED ================= -->
+
+                  <template
+                    v-else-if="item.Status === 'Borrowed'"
+                  >
+
+                    <span class="waiting-text">
+                      ⏳ รอผู้ยืมกดขอคืน
+                    </span>
+
+                  </template>
+
+
+                  <!-- ================= RETURN REQUESTED ================= -->
+
+                  <template
+                    v-else-if="item.Status === 'ReturnRequested'"
+                  >
+
+                    <button
+                      class="approve-return-btn"
+                      @click="approveReturn(item.TransactionID)"
+                    >
+                      🔄 อนุมัติการคืน
+                    </button>
+
+                  </template>
+
+
+                  <!-- ================= RETURNED ================= -->
+
+                  <template
+                    v-else-if="item.Status === 'Returned'"
+                  >
+
+                    <span class="returned-text">
+                      ✅ คืนเรียบร้อยแล้ว
+                    </span>
+
+                  </template>
+
+
+                  <!-- ================= REJECTED ================= -->
+
+                  <template
+                    v-else-if="item.Status === 'Rejected'"
+                  >
+
+                    <span class="rejected-text">
+                      ❌ รายการถูกปฏิเสธ
+                    </span>
+
+                  </template>
+
+
+                  <template v-else>
+
+                    <span>
+                      -
+                    </span>
+
+                  </template>
 
                 </div>
-
-
-                <!-- Borrowed -->
-
-                <button
-                  v-else-if="borrow.Status === 'Borrowed'"
-                  class="return-btn"
-                  @click="returnAsset(borrow.TransactionID)"
-                >
-                  รับคืน
-                </button>
-
-
-                <!-- Returned -->
-
-                <span
-                  v-else-if="borrow.Status === 'Returned'"
-                  class="done"
-                >
-                  คืนแล้ว
-                </span>
-
-
-                <!-- Rejected -->
-
-                <span
-                  v-else-if="borrow.Status === 'Rejected'"
-                  class="rejected-text"
-                >
-                  ปฏิเสธแล้ว
-                </span>
 
               </td>
 
@@ -497,10 +473,10 @@
             <tr v-if="borrows.length === 0">
 
               <td
-                colspan="9"
+                colspan="10"
                 class="empty"
               >
-                ไม่มีรายการยืม
+                ไม่พบรายการยืมคืน
               </td>
 
             </tr>
@@ -511,7 +487,7 @@
 
       </div>
 
-    </div>
+    </section>
 
   </div>
 </template>
@@ -519,854 +495,964 @@
 
 <script setup>
 
-import {
-  ref,
-  onMounted
-} from 'vue';
-
-import {
-  useRouter
-} from 'vue-router';
-
-import api from '../api';
+import { ref, computed, onMounted } from 'vue'
+import api from '../api'
 
 
-/* =========================================================
-   ROUTER
-========================================================= */
+// ======================================================
+// DATA
+// ======================================================
 
-const router = useRouter();
-
-
-/* =========================================================
-   DATA
-========================================================= */
-
-const assets = ref([]);
-
-const categories = ref([]);
-
-const borrows = ref([]);
-
-const q = ref('');
-
-const message = ref('');
-
-const error = ref('');
-
+const assets = ref([])
+const categories = ref([])
+const borrows = ref([])
 
 const stats = ref({
-  assets: 0,
-  available: 0,
-  borrowed: 0,
-  pending: 0,
-  returned: 0,
-  rejected: 0,
-  employees: 0
-});
+  totalAssets: 0,
+  availableAssets: 0,
+  borrowedAssets: 0,
+  pendingBorrow: 0,
+  returned: 0
+})
 
 
-/* =========================================================
-   FORM
-========================================================= */
+// ======================================================
+// ASSET FORM
+// ======================================================
 
-const blank = () => ({
-  AssetID: null,
+const showAssetForm = ref(false)
+const editingAsset = ref(null)
+
+const assetForm = ref({
   AssetName: '',
-  CategoryID: '',
-  Status: 'Available',
-  PurchaseDate: '',
-  Price: '',
   SerialNumber: '',
-  Location: ''
-});
+  CategoryID: '',
+  Status: 'Available'
+})
 
 
-const form = ref(blank());
+// ======================================================
+// RETURN REQUEST COUNT
+// ======================================================
+
+const returnRequestedCount = computed(() => {
+
+  return borrows.value.filter(
+    item => item.Status === 'ReturnRequested'
+  ).length
+
+})
 
 
-/* =========================================================
-   LOAD ASSETS
-========================================================= */
+// ======================================================
+// LOAD ALL
+// ======================================================
+
+async function loadAll() {
+
+  try {
+
+    await Promise.all([
+      loadStats(),
+      loadAssets(),
+      loadCategories(),
+      loadBorrows()
+    ])
+
+  } catch (error) {
+
+    console.error('Load Admin data error:', error)
+
+  }
+
+}
+
+
+// ======================================================
+// LOAD STATS
+// ======================================================
+
+async function loadStats() {
+
+  try {
+
+    const response = await api.get('/admin/stats')
+
+    const data =
+      response.data?.data ||
+      response.data ||
+      {}
+
+    stats.value = {
+
+      totalAssets:
+        data.totalAssets ??
+        data.total ??
+        0,
+
+      availableAssets:
+        data.availableAssets ??
+        data.available ??
+        0,
+
+      borrowedAssets:
+        data.borrowedAssets ??
+        data.borrowed ??
+        0,
+
+      pendingBorrow:
+        data.pendingBorrow ??
+        data.pending ??
+        0,
+
+      returned:
+        data.returned ??
+        0
+
+    }
+
+  } catch (error) {
+
+    console.error('Load stats error:', error)
+
+  }
+
+}
+
+
+// ======================================================
+// LOAD ASSETS
+// ======================================================
 
 async function loadAssets() {
 
   try {
 
-    const response = await api.get(
-      '/assets',
-      {
-        params: {
-          q: q.value
-        }
-      }
-    );
-
-    /*
-      รองรับทั้ง API แบบเก่า
-      และ API แบบ { success, data }
-    */
+    const response = await api.get('/assets')
 
     assets.value =
       response.data?.data ??
       response.data ??
-      [];
+      []
 
-  } catch (e) {
+  } catch (error) {
 
-    error.value =
-      e.response?.data?.message ||
-      'โหลดข้อมูลทรัพย์สินไม่สำเร็จ';
+    console.error('Load assets error:', error)
+
+    assets.value = []
 
   }
 
 }
 
 
-/* =========================================================
-   LOAD ALL DATA
-========================================================= */
+// ======================================================
+// LOAD CATEGORIES
+// ======================================================
 
-async function load() {
+async function loadCategories() {
 
   try {
 
-    error.value = '';
-
-    const [
-      assetsResponse,
-      categoriesResponse,
-      borrowResponse,
-      statsResponse
-    ] = await Promise.all([
-
-      api.get(
-        '/assets',
-        {
-          params: {
-            q: q.value
-          }
-        }
-      ),
-
-      api.get('/assets/categories'),
-
-      api.get('/borrow'),
-
-      api.get('/admin/stats')
-
-    ]);
-
-
-    /* Assets */
-
-    assets.value =
-      assetsResponse.data?.data ??
-      assetsResponse.data ??
-      [];
-
-
-    /* Categories */
+    const response =
+      await api.get('/assets/categories')
 
     categories.value =
-      categoriesResponse.data?.data ??
-      categoriesResponse.data ??
-      [];
+      response.data?.data ??
+      response.data ??
+      []
 
+  } catch (error) {
 
-    /* Borrow */
+    console.error('Load categories error:', error)
 
-    borrows.value =
-      borrowResponse.data?.data ??
-      borrowResponse.data ??
-      [];
-
-
-    /* Stats */
-
-    const statsData =
-      statsResponse.data?.data ??
-      statsResponse.data ??
-      {};
-
-    stats.value = {
-      assets: Number(statsData.assets || 0),
-      available: Number(statsData.available || 0),
-      borrowed: Number(statsData.borrowed || 0),
-      pending: Number(statsData.pending || 0),
-      returned: Number(statsData.returned || 0),
-      rejected: Number(statsData.rejected || 0),
-      employees: Number(statsData.employees || 0)
-    };
-
-  } catch (e) {
-
-    console.error(e);
-
-    error.value =
-      e.response?.data?.message ||
-      'โหลดข้อมูล Admin ไม่สำเร็จ';
+    categories.value = []
 
   }
 
 }
 
 
-/* =========================================================
-   EDIT ASSET
-========================================================= */
+// ======================================================
+// LOAD BORROWS
+// ======================================================
 
-function edit(asset) {
-
-  form.value = {
-    AssetID: asset.AssetID,
-    AssetName: asset.AssetName || '',
-    CategoryID: asset.CategoryID || '',
-    Status: asset.Status || 'Available',
-    PurchaseDate: asset.PurchaseDate
-      ? String(asset.PurchaseDate).substring(0, 10)
-      : '',
-    Price: asset.Price ?? '',
-    SerialNumber: asset.SerialNumber || '',
-    Location: asset.Location || ''
-  };
-
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior: 'smooth'
-  });
-
-}
-
-
-/* =========================================================
-   CLEAR FORM
-========================================================= */
-
-function clear() {
-
-  form.value = blank();
-
-}
-
-
-/* =========================================================
-   SAVE ASSET
-========================================================= */
-
-async function save() {
+async function loadBorrows() {
 
   try {
 
-    message.value = '';
-    error.value = '';
+    const response = await api.get('/borrow')
 
-    if (!form.value.AssetName) {
+    borrows.value =
+      response.data?.data ??
+      response.data ??
+      []
 
-      error.value =
-        'กรุณากรอกชื่อทรัพย์สิน';
+  } catch (error) {
 
-      return;
+    console.error('Load borrow error:', error)
+
+    borrows.value = []
+
+  }
+
+}
+
+
+// ======================================================
+// ASSET FORM
+// ======================================================
+
+function openAssetForm(asset = null) {
+
+  editingAsset.value = asset
+
+  if (asset) {
+
+    assetForm.value = {
+
+      AssetName: asset.AssetName || '',
+
+      SerialNumber:
+        asset.SerialNumber || '',
+
+      CategoryID:
+        asset.CategoryID || '',
+
+      Status:
+        asset.Status || 'Available'
+
     }
 
-    if (!form.value.CategoryID) {
+  } else {
 
-      error.value =
-        'กรุณาเลือกประเภททรัพย์สิน';
+    assetForm.value = {
 
-      return;
+      AssetName: '',
+
+      SerialNumber: '',
+
+      CategoryID: '',
+
+      Status: 'Available'
+
     }
 
+  }
 
-    if (form.value.AssetID) {
+  showAssetForm.value = true
+
+}
+
+
+function closeAssetForm() {
+
+  showAssetForm.value = false
+
+  editingAsset.value = null
+
+}
+
+
+// ======================================================
+// SAVE ASSET
+// ======================================================
+
+async function saveAsset() {
+
+  if (!assetForm.value.AssetName.trim()) {
+
+    alert('กรุณากรอกชื่อทรัพย์สิน')
+
+    return
+
+  }
+
+
+  try {
+
+    if (editingAsset.value) {
 
       await api.put(
-        `/assets/${form.value.AssetID}`,
-        form.value
-      );
+        `/assets/${editingAsset.value.AssetID}`,
+        assetForm.value
+      )
 
-      message.value =
-        'แก้ไขทรัพย์สินสำเร็จ';
+      alert('แก้ไขทรัพย์สินเรียบร้อยแล้ว')
 
     } else {
 
       await api.post(
         '/assets',
-        form.value
-      );
+        assetForm.value
+      )
 
-      message.value =
-        'เพิ่มทรัพย์สินสำเร็จ';
+      alert('เพิ่มทรัพย์สินเรียบร้อยแล้ว')
+
     }
 
 
-    clear();
+    closeAssetForm()
 
-    await load();
+    await loadAll()
 
-  } catch (e) {
+  } catch (error) {
 
-    error.value =
-      e.response?.data?.message ||
-      'บันทึกทรัพย์สินไม่สำเร็จ';
+    console.error('Save asset error:', error)
+
+    alert(
+      error.response?.data?.message ||
+      'ไม่สามารถบันทึกทรัพย์สินได้'
+    )
 
   }
 
 }
 
 
-/* =========================================================
-   DELETE ASSET
-========================================================= */
+// ======================================================
+// DELETE ASSET
+// ======================================================
 
-async function remove(id) {
+async function deleteAsset(assetId) {
 
-  if (
-    !confirm(
-      'ยืนยันการลบทรัพย์สินรายการนี้?'
-    )
-  ) {
-    return;
-  }
+  const confirmed = confirm(
+    'คุณต้องการลบทรัพย์สินรายการนี้หรือไม่?'
+  )
+
+  if (!confirmed) return
 
 
   try {
 
-    message.value = '';
-    error.value = '';
+    await api.delete(`/assets/${assetId}`)
 
-    await api.delete(
-      `/assets/${id}`
-    );
+    alert('ลบทรัพย์สินเรียบร้อยแล้ว')
 
-    message.value =
-      'ลบทรัพย์สินสำเร็จ';
+    await loadAll()
 
-    await load();
+  } catch (error) {
 
-  } catch (e) {
+    console.error('Delete asset error:', error)
 
-    error.value =
-      e.response?.data?.message ||
-      'ลบทรัพย์สินไม่สำเร็จ';
+    alert(
+      error.response?.data?.message ||
+      'ไม่สามารถลบทรัพย์สินได้'
+    )
 
   }
 
 }
 
 
-/* =========================================================
-   APPROVE BORROW
-========================================================= */
+// ======================================================
+// APPROVE BORROW
+// ======================================================
 
-async function approve(id) {
+async function approveBorrow(transactionId) {
 
-  if (
-    !confirm(
-      'ยืนยันอนุมัติการยืมทรัพย์สินรายการนี้?'
-    )
-  ) {
-    return;
-  }
+  const confirmed = confirm(
+    'ยืนยันการอนุมัติการยืมทรัพย์สินรายการนี้หรือไม่?'
+  )
+
+  if (!confirmed) return
 
 
   try {
-
-    message.value = '';
-    error.value = '';
 
     await api.put(
-      `/borrow/${id}/approve`
-    );
+      `/borrow/${transactionId}/approve`
+    )
 
-    message.value =
-      'อนุมัติการยืมสำเร็จ';
+    alert('อนุมัติการยืมเรียบร้อยแล้ว')
 
-    await load();
+    await loadAll()
 
-  } catch (e) {
+  } catch (error) {
 
-    error.value =
-      e.response?.data?.message ||
-      'อนุมัติไม่สำเร็จ';
+    console.error('Approve borrow error:', error)
+
+    alert(
+      error.response?.data?.message ||
+      'ไม่สามารถอนุมัติการยืมได้'
+    )
 
   }
 
 }
 
 
-/* =========================================================
-   REJECT BORROW
-========================================================= */
+// ======================================================
+// REJECT BORROW
+// ======================================================
 
-async function reject(id) {
+async function rejectBorrow(transactionId) {
 
-  if (
-    !confirm(
-      'ยืนยันปฏิเสธคำขอยืมรายการนี้?'
-    )
-  ) {
-    return;
-  }
+  const confirmed = confirm(
+    'ยืนยันการปฏิเสธคำขอยืมรายการนี้หรือไม่?'
+  )
+
+  if (!confirmed) return
 
 
   try {
 
-    message.value = '';
-    error.value = '';
-
     await api.put(
-      `/borrow/${id}/reject`
-    );
+      `/borrow/${transactionId}/reject`
+    )
 
-    message.value =
-      'ปฏิเสธการยืมสำเร็จ';
+    alert('ปฏิเสธคำขอยืมเรียบร้อยแล้ว')
 
-    await load();
+    await loadAll()
 
-  } catch (e) {
+  } catch (error) {
 
-    error.value =
-      e.response?.data?.message ||
-      'ปฏิเสธไม่สำเร็จ';
+    console.error('Reject borrow error:', error)
+
+    alert(
+      error.response?.data?.message ||
+      'ไม่สามารถปฏิเสธคำขอยืมได้'
+    )
 
   }
 
 }
 
 
-/* =========================================================
-   RETURN ASSET
-========================================================= */
+// ======================================================
+// APPROVE RETURN
+// ======================================================
 
-async function returnAsset(id) {
+async function approveReturn(transactionId) {
 
-  if (
-    !confirm(
-      'ยืนยันว่ารับคืนทรัพย์สินรายการนี้แล้ว?'
-    )
-  ) {
-    return;
-  }
+  const confirmed = confirm(
+    'ยืนยันการอนุมัติการคืนทรัพย์สินรายการนี้หรือไม่?\n\n' +
+    'เมื่อกดยืนยัน สถานะการยืมจะเปลี่ยนเป็น "คืนแล้ว" ' +
+    'และทรัพย์สินจะกลับมาเป็น "พร้อมใช้งาน"'
+  )
+
+  if (!confirmed) return
 
 
   try {
 
-    message.value = '';
-    error.value = '';
-
     await api.put(
-      `/borrow/${id}/return`
-    );
+      `/borrow/${transactionId}/approve-return`
+    )
 
-    message.value =
-      'รับคืนทรัพย์สินสำเร็จ';
+    alert(
+      'อนุมัติการคืนเรียบร้อยแล้ว\n' +
+      'ทรัพย์สินกลับมาเป็นสถานะพร้อมใช้งานแล้ว'
+    )
 
-    await load();
+    await loadAll()
 
-  } catch (e) {
+  } catch (error) {
 
-    error.value =
-      e.response?.data?.message ||
-      'รับคืนทรัพย์สินไม่สำเร็จ';
+    console.error('Approve return error:', error)
+
+    alert(
+      error.response?.data?.message ||
+      'ไม่สามารถอนุมัติการคืนได้'
+    )
 
   }
 
 }
 
 
-/* =========================================================
-   STATUS TEXT
-========================================================= */
+// ======================================================
+// DATE FORMAT
+// ======================================================
 
-function statusText(status) {
+function formatDate(date) {
+
+  if (!date) return '-'
+
+  try {
+
+    return new Date(date).toLocaleDateString(
+      'th-TH',
+      {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }
+    )
+
+  } catch {
+
+    return date
+
+  }
+
+}
+
+
+// ======================================================
+// ASSET STATUS TEXT
+// ======================================================
+
+function assetStatusText(status) {
 
   const map = {
 
-    PendingApproval: 'รออนุมัติ',
+    Available: 'พร้อมใช้งาน',
+
+    Borrowed: 'กำลังถูกยืม',
+
+    Maintenance: 'ซ่อมบำรุง'
+
+  }
+
+  return map[status] || status || '-'
+
+}
+
+
+// ======================================================
+// BORROW STATUS TEXT
+// ======================================================
+
+function borrowStatusText(status) {
+
+  const map = {
+
+    PendingApproval: 'รออนุมัติการยืม',
 
     Borrowed: 'กำลังยืม',
 
+    ReturnRequested: 'รออนุมัติการคืน',
+
     Returned: 'คืนแล้ว',
 
-    Rejected: 'ปฏิเสธ',
+    Rejected: 'ปฏิเสธ'
 
-    Available: 'พร้อมให้ยืม',
-
-    Broken: 'ชำรุด'
-
-  };
-
-  return map[status] || status;
-
-}
-
-
-/* =========================================================
-   DATE
-========================================================= */
-
-function formatDate(value) {
-
-  if (!value) {
-    return '-';
   }
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString(
-    'th-TH'
-  );
+  return map[status] || status || '-'
 
 }
 
 
-/* =========================================================
-   LOGOUT
-========================================================= */
-
-function logout() {
-
-  localStorage.removeItem('token');
-
-  localStorage.removeItem('user');
-
-  router.push('/login');
-
-}
-
-
-/* =========================================================
-   START
-========================================================= */
+// ======================================================
+// ON MOUNT
+// ======================================================
 
 onMounted(() => {
 
-  load();
+  loadAll()
 
-});
+})
 
 </script>
 
 
 <style scoped>
 
+* {
+  box-sizing: border-box;
+}
+
 .admin-page {
-  max-width: 1400px;
-  margin: 0 auto;
+  min-height: 100vh;
   padding: 30px;
+  background: #f5f7fb;
+  color: #1f2937;
 }
 
 
-/* =========================================================
-   HEADER
-========================================================= */
+/* ================= HEADER ================= */
 
-.header {
+.admin-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-.header h1 {
+.admin-header h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.admin-header p {
   margin: 0;
+  color: #6b7280;
 }
 
-.header p {
-  margin-top: 5px;
-  opacity: 0.7;
-}
 
-.logout-btn {
-  padding: 10px 18px;
+/* ================= BUTTON ================= */
+
+button {
   border: none;
-  border-radius: 8px;
   cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+.refresh-btn {
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: #111827;
+  color: white;
+}
+
+.primary-btn {
+  padding: 11px 18px;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+}
+
+.primary-btn:hover {
+  background: #1d4ed8;
+}
+
+.cancel-btn {
+  padding: 11px 18px;
+  border-radius: 10px;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.edit-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.delete-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.approve-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.reject-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.approve-return-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #7c3aed;
+  color: white;
+  font-weight: 600;
+}
+
+.approve-return-btn:hover {
+  background: #6d28d9;
 }
 
 
-/* =========================================================
-   GRID
-========================================================= */
+/* ================= DASHBOARD ================= */
 
-.grid {
+.dashboard {
   display: grid;
-  grid-template-columns:
-    repeat(auto-fit, minmax(180px, 1fr));
-
-  gap: 15px;
-
-  margin-bottom: 20px;
-}
-
-
-/* =========================================================
-   CARD
-========================================================= */
-
-.card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-
-  box-shadow:
-    0 2px 10px rgba(0, 0, 0, 0.08);
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
 }
 
 .stat-card {
-  text-align: center;
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
 }
 
-.stat-card h2 {
-  font-size: 32px;
-  margin: 10px 0 0;
+.stat-icon {
+  font-size: 30px;
 }
 
-.stat-card.pending {
-  border-left: 5px solid orange;
+.stat-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 5px;
 }
 
-.stat-card.returned {
-  border-left: 5px solid green;
+.stat-card strong {
+  display: block;
+  font-size: 25px;
 }
 
-
-/* =========================================================
-   ALERT
-========================================================= */
-
-.alert {
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 15px;
+.stat-card.warning {
+  border-left: 5px solid #f59e0b;
 }
 
-.alert.success {
-  background: #e8f7ed;
+.stat-card.return-warning {
+  border-left: 5px solid #7c3aed;
 }
 
-.alert.error {
-  background: #fdeaea;
-  color: #b00020;
+.stat-card.success {
+  border-left: 5px solid #16a34a;
 }
 
 
-/* =========================================================
-   SEARCH
-========================================================= */
+/* ================= PANEL ================= */
 
-.search {
+.panel {
+  background: white;
+  border-radius: 18px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.panel-header h2 {
+  margin: 0 0 6px;
+}
+
+.panel-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+
+/* ================= FORM ================= */
+
+.asset-form {
+  background: #f9fafb;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.asset-form h3 {
+  margin-top: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 600;
+}
+
+.form-group input,
+.form-group select {
   width: 100%;
-  box-sizing: border-box;
-  padding: 12px;
-  margin-bottom: 15px;
+  padding: 11px 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  outline: none;
+  background: white;
+}
 
-  border: 1px solid #ddd;
-  border-radius: 8px;
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #2563eb;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 
-/* =========================================================
-   TABLE
-========================================================= */
+/* ================= RETURN ALERT ================= */
+
+.return-alert {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #d8b4fe;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+
+/* ================= TABLE ================= */
 
 .table-wrapper {
+  width: 100%;
   overflow-x: auto;
 }
 
 table {
   width: 100%;
+  min-width: 1100px;
   border-collapse: collapse;
 }
 
 th,
 td {
-  padding: 12px;
-  border-bottom: 1px solid #eee;
+  padding: 13px 12px;
   text-align: left;
+  border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
 }
 
 th {
-  background: #f7f7f7;
+  background: #f9fafb;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+td {
+  font-size: 14px;
 }
 
 
-/* =========================================================
-   STATUS
-========================================================= */
+/* ================= STATUS ================= */
 
 .status {
   display: inline-block;
-
   padding: 5px 10px;
-
-  border-radius: 20px;
-
-  font-size: 13px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .status.Available {
-  background: #e8f7ed;
-  color: #18733a;
+  background: #dcfce7;
+  color: #15803d;
 }
 
 .status.Borrowed {
-  background: #fff4d6;
-  color: #8a5b00;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
-.status.Broken {
-  background: #fdeaea;
-  color: #b00020;
+.status.Maintenance {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .status.PendingApproval {
-  background: #fff4d6;
-  color: #8a5b00;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status.ReturnRequested {
+  background: #f3e8ff;
+  color: #7e22ce;
 }
 
 .status.Returned {
-  background: #e8f7ed;
-  color: #18733a;
+  background: #dcfce7;
+  color: #15803d;
 }
 
 .status.Rejected {
-  background: #fdeaea;
-  color: #b00020;
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 
-/* =========================================================
-   FORM
-========================================================= */
+/* ================= ACTION ================= */
 
-.form-grid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(auto-fit, minmax(220px, 1fr));
-
-  gap: 15px;
-}
-
-.form-group {
+.action-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.form-group input,
-.form-group select {
-  padding: 10px;
-
-  border: 1px solid #ddd;
-  border-radius: 7px;
-
-  box-sizing: border-box;
-}
-
-.form-actions {
-  margin-top: 20px;
-
+.borrow-actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 
-
-/* =========================================================
-   BUTTONS
-========================================================= */
-
-button {
-  border: none;
-  border-radius: 7px;
-
-  padding: 9px 14px;
-
-  cursor: pointer;
+.waiting-text {
+  color: #6b7280;
+  font-size: 13px;
 }
 
-.primary {
-  background: #2563eb;
-  color: white;
-}
-
-.secondary {
-  background: #e5e7eb;
-}
-
-.small-btn {
-  margin-right: 5px;
-}
-
-.danger {
-  background: #dc2626;
-  color: white;
-}
-
-.approve {
-  background: #16a34a;
-  color: white;
-}
-
-.reject {
-  background: #dc2626;
-  color: white;
-}
-
-.return-btn {
-  background: #2563eb;
-  color: white;
-}
-
-.actions {
-  display: flex;
-  gap: 6px;
-}
-
-.done {
-  color: #16803c;
+.returned-text {
+  color: #15803d;
   font-weight: 600;
+  font-size: 13px;
 }
 
 .rejected-text {
-  color: #b00020;
+  color: #dc2626;
   font-weight: 600;
+  font-size: 13px;
 }
+
+
+/* ================= EMPTY ================= */
 
 .empty {
   text-align: center;
   padding: 30px;
-  opacity: 0.6;
+  color: #9ca3af;
 }
 
 
-/* =========================================================
-   MOBILE
-========================================================= */
+/* ================= RESPONSIVE ================= */
 
-@media (max-width: 700px) {
+@media (max-width: 1400px) {
+
+  .dashboard {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+}
+
+@media (max-width: 800px) {
 
   .admin-page {
     padding: 15px;
   }
 
-  .header {
+  .admin-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 15px;
   }
 
-  .card {
-    padding: 15px;
+  .dashboard {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+@media (max-width: 500px) {
+
+  .dashboard {
+    grid-template-columns: 1fr;
   }
 
 }

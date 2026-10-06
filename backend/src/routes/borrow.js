@@ -32,7 +32,10 @@ router.post('/', auth, async (req, res, next) => {
     try {
       await conn.beginTransaction();
 
-      /* ตรวจสอบทรัพย์สิน */
+      /* =====================================================
+         ตรวจสอบทรัพย์สิน
+      ===================================================== */
+
       const [assets] = await conn.query(
         `SELECT
           AssetID,
@@ -65,17 +68,20 @@ router.post('/', auth, async (req, res, next) => {
         });
       }
 
-      /* สร้างรายการยืม */
+      /* =====================================================
+         สร้างรายการยืม
+      ===================================================== */
+
       const [result] = await conn.query(
         `INSERT INTO BorrowTransaction
-          (
-            EmployeeID,
-            AssetID,
-            BorrowDate,
-            DueDate,
-            Status
-          )
-         VALUES (?, ?, CURDATE(), ?, 'PendingApproval')`,
+        (
+          EmployeeID,
+          AssetID,
+          BorrowDate,
+          DueDate,
+          Status
+        )
+        VALUES (?, ?, CURDATE(), ?, 'PendingApproval')`,
         [
           req.user.id,
           assetId,
@@ -83,14 +89,17 @@ router.post('/', auth, async (req, res, next) => {
         ]
       );
 
-      /* แจ้งเตือน Employee */
+      /* =====================================================
+         แจ้งเตือน Employee
+      ===================================================== */
+
       await conn.query(
         `INSERT INTO Notification
-          (
-            EmployeeID,
-            Message
-          )
-         VALUES (?, ?)`,
+        (
+          EmployeeID,
+          Message
+        )
+        VALUES (?, ?)`,
         [
           req.user.id,
           `ส่งคำขอยืม ${asset.AssetName} แล้ว รอ Admin อนุมัติ`
@@ -175,6 +184,148 @@ router.get('/my', auth, async (req, res, next) => {
 
 
 /* =========================================================
+   EMPLOYEE - REQUEST RETURN
+   PUT /api/borrow/:id/request-return
+
+   ผู้ยืมกด "ขอคืนทรัพย์สิน"
+========================================================= */
+
+router.put('/:id/request-return', auth, async (req, res, next) => {
+  try {
+    /* เฉพาะ Employee */
+    if (req.user.type !== 'employee') {
+      return res.status(403).json({
+        success: false,
+        message: 'เฉพาะสมาชิกเท่านั้นที่สามารถขอคืนทรัพย์สินได้'
+      });
+    }
+
+    const transactionId = req.params.id;
+
+    const conn = await pool.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      /* =====================================================
+         ตรวจสอบรายการยืม
+      ===================================================== */
+
+      const [rows] = await conn.query(
+        `SELECT
+          b.TransactionID,
+          b.EmployeeID,
+          b.AssetID,
+          b.Status,
+
+          a.AssetName,
+          a.SerialNumber,
+          a.Status AS AssetStatus
+
+         FROM BorrowTransaction b
+
+         JOIN Asset a
+           ON a.AssetID = b.AssetID
+
+         WHERE b.TransactionID = ?
+           AND b.EmployeeID = ?
+
+         FOR UPDATE`,
+        [
+          transactionId,
+          req.user.id
+        ]
+      );
+
+      if (rows.length === 0) {
+        await conn.rollback();
+
+        return res.status(404).json({
+          success: false,
+          message: 'ไม่พบรายการยืมของคุณ'
+        });
+      }
+
+      const borrow = rows[0];
+
+      /* =====================================================
+         ต้องเป็น Borrowed เท่านั้น
+      ===================================================== */
+
+      if (borrow.Status !== 'Borrowed') {
+        await conn.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message: 'รายการนี้ไม่อยู่ในสถานะกำลังยืม จึงไม่สามารถขอคืนได้'
+        });
+      }
+
+      /* =====================================================
+         ตรวจสอบ Asset
+      ===================================================== */
+
+      if (borrow.AssetStatus !== 'Borrowed') {
+        await conn.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message: 'สถานะทรัพย์สินไม่ถูกต้อง'
+        });
+      }
+
+      /* =====================================================
+         เปลี่ยนสถานะเป็น ReturnRequested
+      ===================================================== */
+
+      await conn.query(
+        `UPDATE BorrowTransaction
+         SET Status = 'ReturnRequested'
+         WHERE TransactionID = ?`,
+        [transactionId]
+      );
+
+      /* =====================================================
+         แจ้ง Admin
+         ตอนนี้ระบบยังไม่มีช่อง AdminID ใน Notification
+         จึงเก็บ Notification ให้ Employee เพื่อยืนยันคำขอ
+      ===================================================== */
+
+      await conn.query(
+        `INSERT INTO Notification
+        (
+          EmployeeID,
+          Message
+        )
+        VALUES (?, ?)`,
+        [
+          borrow.EmployeeID,
+          `ส่งคำขอคืน ${borrow.AssetName} (${borrow.SerialNumber}) แล้ว รอ Admin อนุมัติการคืน`
+        ]
+      );
+
+      await conn.commit();
+
+      return res.json({
+        success: true,
+        message: 'ส่งคำขอคืนทรัพย์สินสำเร็จ'
+      });
+
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+
+    } finally {
+      conn.release();
+    }
+
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+/* =========================================================
    ADMIN - GET ALL BORROW TRANSACTIONS
    GET /api/borrow
 ========================================================= */
@@ -242,7 +393,10 @@ router.put('/:id/approve', auth, adminOnly, async (req, res, next) => {
     try {
       await conn.beginTransaction();
 
-      /* ตรวจสอบรายการยืม */
+      /* =====================================================
+         ตรวจสอบรายการยืม
+      ===================================================== */
+
       const [rows] = await conn.query(
         `SELECT
           b.TransactionID,
@@ -275,7 +429,7 @@ router.put('/:id/approve', auth, adminOnly, async (req, res, next) => {
 
       const borrow = rows[0];
 
-      /* ต้องเป็น PendingApproval เท่านั้น */
+      /* ต้องเป็น PendingApproval */
       if (borrow.Status !== 'PendingApproval') {
         await conn.rollback();
 
@@ -295,14 +449,15 @@ router.put('/:id/approve', auth, adminOnly, async (req, res, next) => {
         });
       }
 
-      /* เปลี่ยนรายการยืมเป็น Borrowed */
+      /* =====================================================
+         เปลี่ยนรายการยืมเป็น Borrowed
+      ===================================================== */
+
       await conn.query(
         `UPDATE BorrowTransaction
-
          SET
            AdminID = ?,
            Status = 'Borrowed'
-
          WHERE TransactionID = ?`,
         [
           req.user.id,
@@ -310,24 +465,28 @@ router.put('/:id/approve', auth, adminOnly, async (req, res, next) => {
         ]
       );
 
-      /* เปลี่ยน Asset เป็น Borrowed */
+      /* =====================================================
+         เปลี่ยน Asset เป็น Borrowed
+      ===================================================== */
+
       await conn.query(
         `UPDATE Asset
-
          SET Status = 'Borrowed'
-
          WHERE AssetID = ?`,
         [borrow.AssetID]
       );
 
-      /* แจ้ง Employee */
+      /* =====================================================
+         แจ้ง Employee
+      ===================================================== */
+
       await conn.query(
         `INSERT INTO Notification
-          (
-            EmployeeID,
-            Message
-          )
-         VALUES (?, ?)`,
+        (
+          EmployeeID,
+          Message
+        )
+        VALUES (?, ?)`,
         [
           borrow.EmployeeID,
           `คำขอยืม ${borrow.AssetName} ได้รับการอนุมัติแล้ว`
@@ -356,11 +515,13 @@ router.put('/:id/approve', auth, adminOnly, async (req, res, next) => {
 
 
 /* =========================================================
-   ADMIN - RETURN ASSET
-   PUT /api/borrow/:id/return
+   ADMIN - APPROVE RETURN
+   PUT /api/borrow/:id/approve-return
+
+   Admin กด "อนุมัติการคืน"
 ========================================================= */
 
-router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
+router.put('/:id/approve-return', auth, adminOnly, async (req, res, next) => {
   try {
 
     const transactionId = req.params.id;
@@ -371,7 +532,7 @@ router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
       await conn.beginTransaction();
 
       /* =====================================================
-         ตรวจสอบรายการยืม
+         ตรวจสอบรายการขอคืน
       ===================================================== */
 
       const [rows] = await conn.query(
@@ -382,6 +543,7 @@ router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
           b.Status,
 
           a.AssetName,
+          a.SerialNumber,
           a.Status AS AssetStatus
 
          FROM BorrowTransaction b
@@ -395,34 +557,32 @@ router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
         [transactionId]
       );
 
-      /* ไม่พบรายการ */
       if (rows.length === 0) {
         await conn.rollback();
 
         return res.status(404).json({
           success: false,
-          message: 'ไม่พบรายการยืม'
+          message: 'ไม่พบรายการขอคืน'
         });
       }
 
       const borrow = rows[0];
 
       /* =====================================================
-         ต้องเป็น Borrowed เท่านั้น
+         ต้องเป็น ReturnRequested เท่านั้น
       ===================================================== */
 
-      if (borrow.Status !== 'Borrowed') {
+      if (borrow.Status !== 'ReturnRequested') {
         await conn.rollback();
 
         return res.status(400).json({
           success: false,
-          message:
-            'รายการนี้ไม่สามารถคืนได้ เพราะไม่ได้อยู่ในสถานะกำลังยืม'
+          message: 'รายการนี้ไม่ได้อยู่ในสถานะรออนุมัติการคืน'
         });
       }
 
       /* =====================================================
-         ตรวจสอบ Asset
+         Asset ต้อง Borrowed
       ===================================================== */
 
       if (borrow.AssetStatus !== 'Borrowed') {
@@ -430,23 +590,24 @@ router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
 
         return res.status(400).json({
           success: false,
-          message:
-            'สถานะทรัพย์สินไม่ถูกต้อง ไม่สามารถบันทึกการคืนได้'
+          message: 'สถานะทรัพย์สินไม่ถูกต้อง'
         });
       }
 
       /* =====================================================
          UPDATE BorrowTransaction
+
+         ReturnDate = วันที่ Admin รับคืน
+         Status = Returned
+         AdminID = Admin ผู้อนุมัติ
       ===================================================== */
 
       await conn.query(
         `UPDATE BorrowTransaction
-
          SET
            ReturnDate = CURDATE(),
            Status = 'Returned',
            AdminID = ?
-
          WHERE TransactionID = ?`,
         [
           req.user.id,
@@ -461,27 +622,25 @@ router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
 
       await conn.query(
         `UPDATE Asset
-
          SET Status = 'Available'
-
          WHERE AssetID = ?`,
         [borrow.AssetID]
       );
 
       /* =====================================================
-         Notification
+         Notification ให้ผู้ยืม
       ===================================================== */
 
       await conn.query(
         `INSERT INTO Notification
-          (
-            EmployeeID,
-            Message
-          )
-         VALUES (?, ?)`,
+        (
+          EmployeeID,
+          Message
+        )
+        VALUES (?, ?)`,
         [
           borrow.EmployeeID,
-          `ทรัพย์สิน ${borrow.AssetName} ถูกบันทึกว่าคืนแล้ว`
+          `รับการคืนทรัพย์สินแล้ว: ${borrow.AssetName} (${borrow.SerialNumber}) วันที่ ${new Date().toLocaleDateString('th-TH')}`
         ]
       );
 
@@ -489,7 +648,7 @@ router.put('/:id/return', auth, adminOnly, async (req, res, next) => {
 
       return res.json({
         success: true,
-        message: 'คืนทรัพย์สินสำเร็จ'
+        message: 'อนุมัติการคืนทรัพย์สินสำเร็จ'
       });
 
     } catch (error) {
@@ -562,11 +721,9 @@ router.put('/:id/reject', auth, adminOnly, async (req, res, next) => {
 
       await conn.query(
         `UPDATE BorrowTransaction
-
          SET
            AdminID = ?,
            Status = 'Rejected'
-
          WHERE TransactionID = ?`,
         [
           req.user.id,
@@ -576,11 +733,11 @@ router.put('/:id/reject', auth, adminOnly, async (req, res, next) => {
 
       await conn.query(
         `INSERT INTO Notification
-          (
-            EmployeeID,
-            Message
-          )
-         VALUES (?, ?)`,
+        (
+          EmployeeID,
+          Message
+        )
+        VALUES (?, ?)`,
         [
           borrow.EmployeeID,
           `คำขอยืม ${borrow.AssetName} ถูกปฏิเสธ`
@@ -607,5 +764,9 @@ router.put('/:id/reject', auth, adminOnly, async (req, res, next) => {
   }
 });
 
+
+/* =========================================================
+   EXPORT ROUTER
+========================================================= */
 
 export default router;
